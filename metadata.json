@@ -1,0 +1,9 @@
+{
+  "name": "LifeOS - Peak Performance",
+  "description": "An advanced, AI-powered life management system with cinematic interface and sub-system matrix.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

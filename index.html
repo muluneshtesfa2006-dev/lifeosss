@@ -1,0 +1,454 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeOS</title>
+    
+    <!-- LIBRARIES (Loaded via CDN for simplicity) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- CONFIG & STYLES -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#050505',
+                        surface: '#121212',
+                        primary: '#A855F7',
+                        secondary: '#3B82F6',
+                        success: '#10B981',
+                        border: 'rgba(255,255,255,0.1)'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body { background-color: #050505; color: white; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        
+        .glass {
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .card-hover:active { transform: scale(0.98); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- ICONS WRAPPER ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const LucideIcon = window.lucide && window.lucide.icons ? window.lucide.icons[name] : null;
+            if (!LucideIcon) return <span className="text-xs">?</span>;
+            
+            // Render SVG manually since we are in a standalone Babel environment
+            // Using a simple mapping for common icons to ensure they render immediately without waiting for Lucide global
+            const icons = {
+                Home: <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>,
+                CheckSquare: <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>,
+                Book: <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>,
+                PenTool: <path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/>,
+                Plus: <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>,
+                Trash2: <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>,
+                X: <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>,
+                ChevronRight: <polyline points="9 18 15 12 9 6"/>,
+                Calendar: <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>,
+                Search: <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            };
+
+            return (
+                <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width={size} 
+                    height={size} 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className={className}
+                >
+                    {icons[name] || <circle cx="12" cy="12" r="10"/>}
+                </svg>
+            );
+        };
+
+        // --- LOCAL STORAGE MANAGER ---
+        const DB = {
+            get: (key, def) => {
+                try {
+                    const i = localStorage.getItem('lifeos_' + key);
+                    return i ? JSON.parse(i) : def;
+                } catch { return def; }
+            },
+            set: (key, val) => {
+                localStorage.setItem('lifeos_' + key, JSON.stringify(val));
+                // Dispatch event for reactive updates across tabs if needed
+                window.dispatchEvent(new Event('storage'));
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. NAVIGATION SIDEBAR
+        const Sidebar = ({ activeTab, setTab, isMobile }) => {
+            const menu = [
+                { id: 'DASHBOARD', icon: 'Home', label: 'Home' },
+                { id: 'TASKS', icon: 'CheckSquare', label: 'Tasks' },
+                { id: 'NOTES', icon: 'Book', label: 'Notes' },
+                { id: 'JOURNAL', icon: 'PenTool', label: 'Journal' },
+            ];
+
+            return (
+                <div className={`${isMobile ? 'fixed bottom-0 w-full h-20 border-t border-white/10 bg-black/90 backdrop-blur-xl' : 'w-20 md:w-64 h-full border-r border-white/10 bg-surface'} z-50 flex ${isMobile ? 'flex-row justify-around items-center px-2 pb-safe-bottom' : 'flex-col p-4'}`}>
+                    {!isMobile && (
+                        <div className="mb-8 flex items-center gap-3 px-2">
+                            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold text-black">L</div>
+                            <span className="font-bold text-xl tracking-tight hidden md:block">LifeOS</span>
+                        </div>
+                    )}
+                    
+                    {menu.map(item => (
+                        <button 
+                            key={item.id}
+                            onClick={() => setTab(item.id)}
+                            className={`
+                                flex items-center gap-4 p-3 rounded-xl transition-all duration-300 group relative
+                                ${activeTab === item.id ? 'text-white' : 'text-gray-500 hover:text-white hover:bg-white/5'}
+                                ${isMobile ? 'flex-col gap-1 p-2' : 'w-full'}
+                            `}
+                        >
+                            {activeTab === item.id && !isMobile && <div className="absolute left-0 w-1 h-6 bg-primary rounded-r-full" />}
+                            <Icon name={item.icon} className={activeTab === item.id ? 'text-primary' : ''} />
+                            <span className={`text-xs font-bold uppercase tracking-wider ${isMobile ? '' : 'hidden md:block'}`}>
+                                {item.label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        // 2. DASHBOARD VIEW
+        const Dashboard = ({ setTab }) => {
+            const [time, setTime] = useState(new Date());
+            const [tasks] = useState(DB.get('tasks', []));
+            const [notes] = useState(DB.get('notes', []));
+            
+            useEffect(() => {
+                const t = setInterval(() => setTime(new Date()), 1000);
+                return () => clearInterval(t);
+            }, []);
+
+            const pendingTasks = tasks.filter(t => !t.completed).length;
+            const hour = time.getHours();
+            const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+
+            return (
+                <div className="p-6 md:p-10 space-y-8 animate-fade-in max-w-5xl mx-auto w-full">
+                    <header>
+                        <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-2 text-white">{greeting}</h2>
+                        <p className="text-gray-400 font-mono text-sm uppercase tracking-widest">{time.toDateString()} • {time.toLocaleTimeString()}</p>
+                    </header>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div onClick={() => setTab('TASKS')} className="glass p-6 rounded-3xl cursor-pointer hover:border-primary/50 transition-colors group">
+                            <div className="flex justify-between items-start mb-4">
+                                <Icon name="CheckSquare" className="text-secondary" />
+                                <span className="text-2xl font-black">{pendingTasks}</span>
+                            </div>
+                            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">Pending Tasks</h3>
+                            <div className="w-full h-1 bg-white/10 mt-3 rounded-full overflow-hidden">
+                                <div className="h-full bg-secondary" style={{ width: `${Math.max(10, Math.min(100, (tasks.filter(t=>t.completed).length / (tasks.length || 1)) * 100))}%` }}></div>
+                            </div>
+                        </div>
+
+                        <div onClick={() => setTab('NOTES')} className="glass p-6 rounded-3xl cursor-pointer hover:border-primary/50 transition-colors group">
+                            <div className="flex justify-between items-start mb-4">
+                                <Icon name="Book" className="text-primary" />
+                                <span className="text-2xl font-black">{notes.length}</span>
+                            </div>
+                            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">Active Notes</h3>
+                        </div>
+
+                        <div onClick={() => setTab('JOURNAL')} className="glass p-6 rounded-3xl cursor-pointer hover:border-primary/50 transition-colors group">
+                            <div className="flex justify-between items-start mb-4">
+                                <Icon name="PenTool" className="text-success" />
+                                <span className="text-xs bg-success/20 text-success px-2 py-1 rounded">Write</span>
+                            </div>
+                            <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest">Daily Journal</h3>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. TASKS VIEW
+        const Tasks = () => {
+            const [tasks, setTasks] = useState(DB.get('tasks', []));
+            const [input, setInput] = useState('');
+
+            const addTask = (e) => {
+                if (e.key === 'Enter' && input.trim()) {
+                    const newTasks = [{ id: Date.now(), title: input, completed: false }, ...tasks];
+                    setTasks(newTasks);
+                    DB.set('tasks', newTasks);
+                    setInput('');
+                }
+            };
+
+            const toggle = (id) => {
+                const updated = tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+                setTasks(updated);
+                DB.set('tasks', updated);
+            };
+
+            const remove = (id) => {
+                const updated = tasks.filter(t => t.id !== id);
+                setTasks(updated);
+                DB.set('tasks', updated);
+            };
+
+            return (
+                <div className="p-6 md:p-10 h-full flex flex-col max-w-4xl mx-auto w-full animate-fade-in">
+                    <h2 className="text-3xl font-black mb-6">Directives</h2>
+                    
+                    <div className="relative mb-6">
+                        <input 
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={addTask}
+                            placeholder="Add new task..."
+                            className="w-full bg-surface border border-white/10 rounded-2xl py-4 pl-5 pr-12 text-white outline-none focus:border-primary transition-all"
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/10 rounded-lg cursor-pointer" onClick={() => addTask({key:'Enter'})}>
+                            <Icon name="Plus" size={16} />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 pb-20">
+                        {tasks.length === 0 && <div className="text-center text-gray-500 mt-10">No tasks pending.</div>}
+                        {tasks.map(task => (
+                            <div key={task.id} className="group flex items-center gap-3 p-4 bg-surface/50 border border-white/5 rounded-xl hover:border-white/10 transition-all">
+                                <button 
+                                    onClick={() => toggle(task.id)}
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.completed ? 'bg-secondary border-secondary' : 'border-white/20 hover:border-white'}`}
+                                >
+                                    {task.completed && <Icon name="CheckSquare" size={12} className="text-white" />}
+                                </button>
+                                <span className={`flex-1 ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>{task.title}</span>
+                                <button onClick={() => remove(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 transition-opacity">
+                                    <Icon name="Trash2" size={18} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. NOTES VIEW
+        const Notes = () => {
+            const [notes, setNotes] = useState(DB.get('notes', []));
+            const [activeNote, setActiveNote] = useState(null);
+
+            const create = () => {
+                const note = { id: Date.now(), title: '', content: '', date: new Date().toISOString() };
+                const updated = [note, ...notes];
+                setNotes(updated);
+                DB.set('notes', updated);
+                setActiveNote(note);
+            };
+
+            const update = (field, val) => {
+                if (!activeNote) return;
+                const updatedNote = { ...activeNote, [field]: val, date: new Date().toISOString() };
+                setActiveNote(updatedNote);
+                const updatedList = notes.map(n => n.id === activeNote.id ? updatedNote : n);
+                setNotes(updatedList);
+                DB.set('notes', updatedList);
+            };
+
+            const remove = (e, id) => {
+                e.stopPropagation();
+                const updated = notes.filter(n => n.id !== id);
+                setNotes(updated);
+                DB.set('notes', updated);
+                if (activeNote?.id === id) setActiveNote(null);
+            };
+
+            return (
+                <div className="flex h-full animate-fade-in">
+                    {/* LIST */}
+                    <div className={`${activeNote ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-white/10 bg-surface/50`}>
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                            <h2 className="font-bold">Notes</h2>
+                            <button onClick={create} className="p-2 bg-white/10 rounded-lg hover:bg-white/20"><Icon name="Plus" size={18}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {notes.map(note => (
+                                <div 
+                                    key={note.id}
+                                    onClick={() => setActiveNote(note)}
+                                    className={`p-3 rounded-lg cursor-pointer group flex justify-between items-start ${activeNote?.id === note.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                                >
+                                    <div className="overflow-hidden">
+                                        <div className="font-bold truncate text-sm">{note.title || 'Untitled'}</div>
+                                        <div className="text-xs text-gray-500 truncate">{note.content || 'No content'}</div>
+                                    </div>
+                                    <button onClick={(e) => remove(e, note.id)} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500"><Icon name="X" size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* EDITOR */}
+                    {activeNote ? (
+                        <div className="flex-1 flex flex-col h-full bg-background relative">
+                            <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-2 text-gray-400" onClick={() => setActiveNote(null)}>
+                                <Icon name="ChevronRight" className="rotate-180" size={16} /> Back
+                            </div>
+                            <div className="flex-1 p-6 md:p-10 overflow-y-auto">
+                                <input 
+                                    value={activeNote.title}
+                                    onChange={(e) => update('title', e.target.value)}
+                                    placeholder="Title"
+                                    className="w-full bg-transparent text-3xl font-black mb-4 outline-none placeholder-gray-700"
+                                />
+                                <textarea 
+                                    value={activeNote.content}
+                                    onChange={(e) => update('content', e.target.value)}
+                                    placeholder="Start typing..."
+                                    className="w-full h-[calc(100%-100px)] bg-transparent text-lg text-gray-300 outline-none resize-none font-mono leading-relaxed"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="hidden md:flex flex-1 items-center justify-center text-gray-600">Select a note</div>
+                    )}
+                </div>
+            );
+        };
+
+        // 5. JOURNAL VIEW
+        const Journal = () => {
+            const [entries, setEntries] = useState(DB.get('journal', []));
+            const [text, setText] = useState('');
+
+            const saveEntry = () => {
+                if(!text.trim()) return;
+                const entry = { id: Date.now(), date: new Date().toISOString(), content: text };
+                const updated = [entry, ...entries];
+                setEntries(updated);
+                DB.set('journal', updated);
+                setText('');
+            };
+
+            return (
+                <div className="p-6 md:p-10 max-w-3xl mx-auto w-full h-full flex flex-col animate-fade-in">
+                    <h2 className="text-3xl font-black mb-6">Journal</h2>
+                    
+                    <div className="bg-surface border border-white/10 rounded-2xl p-4 mb-8">
+                        <textarea 
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                            placeholder="What's on your mind?"
+                            className="w-full h-32 bg-transparent outline-none resize-none text-white mb-2"
+                        />
+                        <div className="flex justify-end">
+                            <button onClick={saveEntry} className="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition-colors">Log Entry</button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-6 pb-20">
+                        {entries.map(entry => (
+                            <div key={entry.id} className="pl-4 border-l-2 border-white/10">
+                                <div className="text-xs text-primary font-bold uppercase tracking-widest mb-1">
+                                    {new Date(entry.date).toLocaleString()}
+                                </div>
+                                <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">{entry.content}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP SHELL ---
+        const App = () => {
+            const [tab, setTab] = useState('DASHBOARD');
+            const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+            useEffect(() => {
+                const handleResize = () => setIsMobile(window.innerWidth < 768);
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            return (
+                <div className="flex h-screen w-full bg-background text-white font-sans overflow-hidden">
+                    <Sidebar activeTab={tab} setTab={setTab} isMobile={isMobile} />
+                    <main className="flex-1 relative overflow-hidden bg-black">
+                        {tab === 'DASHBOARD' && <Dashboard setTab={setTab} />}
+                        {tab === 'TASKS' && <Tasks />}
+                        {tab === 'NOTES' && <Notes />}
+                        {tab === 'JOURNAL' && <Journal />}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
